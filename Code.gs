@@ -1,7 +1,7 @@
 /*================================================================================================================*
 Invoice Generator
 ================================================================================================================
-Version:      1.2.0
+Version:      1.0.0
 Project Page: https://github.com/Sheetgo/invoice-generator
 Copyright:    (c) 2018 by Sheetgo
 
@@ -12,25 +12,16 @@ Changelog:
 
 1.0.0  Initial release
 1.1.0  Auto configuration
-1.2.0  - Replaced Drive.Files.remove() with DriveApp.setTrashed(true) to fix
-         "API call to drive files delete failed with error: Empty response"
-       - Added retryOnDriveError() wrapper for transient "Service error: Drive"
-       - Hardened cleanup in createInvoices() catch block (no more ReferenceError
-         when invoiceId never got assigned)
-       - convertPDF() rewritten to avoid the deprecated v2 Drive.Files.update
-         signature; now uses DriveApp directly with retries
-       - Fixed createSystem() typos: SETTINGS.col.systemCreated -> SystemCreated,
-         SETTINGS.col.count -> Count, replaced non-existent templateId/folderId
-         keys with Original_ID / Original_Folder_ID
-       - sendInvoice() now logs failures per row but continues processing
-         remaining rows instead of swallowing errors silently
-       - Minor: tightened scoping, removed dead code
 *================================================================================================================*/
 
 /**
- * Project Settings
- * @type {Object}
- */
+* Project Settings
+* @type {JSON}
+*/
+function testUI() {
+  SpreadsheetApp.getUi().alert("Hello! The UI is connected.");
+}
+
 SETTINGS = {
 
   // Spreadsheet name
@@ -45,449 +36,383 @@ SETTINGS = {
   // Set name spreadsheet
   spreadsheetName: 'Invoice data',
 
-  // Set name document
+  //Set name document
   documentName: 'Invoice Template',
 
   // Sheet Settings
-  sheetSettings: "Settings",
+    sheetSettings: "Settings",
 
-  // Authorised editors for protected rows
-  editors: ["anis@sli-eg.com", "george@sli-eg.com"],
 
-  // Retry config for transient Drive errors
-  retry: {
-    maxAttempts: 3,
-    baseDelayMs: 2000
-  },
-
-  // Column Settings (cell references in the Settings sheet)
+  // Column Settings
   col: {
     Count: "B1",
     Original_ID: "B2",
-    Original_Folder_ID: "B3",
-    Draft_ID: "B4",
-    Draft_Folder_ID: "B5",
-    Copy_ID: "B6",
-    Copy_Folder_ID: "B7",
-    Deleted_ID: "B8",
-    Deleted_Folder_ID: "B9",
-    Puplic_ID: "B10",
-    Puplic_Folder_ID: "B11",
+    Original_Folder_ID:"B3",
+    Draft_ID:"B4",
+    Draft_Folder_ID:"B5",
+    Copy_ID:"B6",
+    Copy_Folder_ID:"B7",
+    Deleted_ID:"B8",
+    Deleted_Folder_ID:"B9",
+    Puplic_ID:"B10",
+    Puplic_Folder_ID:"B11",
     SystemCreated: "B12"
   }
 };
 
-/* =================================================================================
- *  UI / Menu
- * ================================================================================= */
-
-function testUI() {
-  SpreadsheetApp.getUi().alert("Hello! The UI is connected.");
-}
-
 /**
- * Runs when the spreadsheet is opened. Creates the custom menu.
- */
+* This funcion will run when you open the spreadsheet. It creates a Spreadsheet menu option to run the spript
+*/
 function onOpen() {
+
+  // Adds a custom menu to the spreadsheet.
   SpreadsheetApp.getUi()
-    .createMenu('Invoice Generator')
-    .addItem('Generate Drafts', 'createDraft')
-    .addItem('Generate Invoices', 'sendInvoice')
-    .addToUi();
+  .createMenu('Invoice Generator')
+  .addItem('Generate Drafts', 'createDraft')
+  .addItem('Generate Invoices', 'sendInvoice')
+  .addToUi();
 }
 
-/* =================================================================================
- *  Retry helper for transient Drive failures
- * ================================================================================= */
-
 /**
- * Re-runs `fn` up to maxAttempts times with linear backoff when it throws.
- * Targets transient Drive failures like "Service error: Drive" or "Empty response".
- *
- * @param {Function} fn      Function to invoke (no args, returns a value)
- * @param {string}   label   Short label for logs
- * @returns {*} Whatever fn returns on a successful attempt
- */
-function retryOnDriveError(fn, label) {
-  var maxAttempts = SETTINGS.retry.maxAttempts;
-  var baseDelayMs = SETTINGS.retry.baseDelayMs;
-  var lastError;
-
-  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return fn();
-    } catch (e) {
-      lastError = e;
-      Logger.log('retryOnDriveError [' + label + '] attempt ' + attempt +
-                 '/' + maxAttempts + ' failed: ' + e.message);
-      if (attempt < maxAttempts) {
-        Utilities.sleep(baseDelayMs * attempt);
-      }
-    }
-  }
-  throw lastError;
-}
-
-/* =================================================================================
- *  System setup
- * ================================================================================= */
-
-/**
- * Initial one-time setup: creates the Drive folder structure and copies the template.
- */
+* This function Create system
+*/
 function createSystem() {
+
   try {
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+
+    // Get name tab
     var sheetSettings = ss.getSheetByName(SETTINGS.sheetSettings);
 
-    // Has the system already been created?
-    var systemCreated = sheetSettings.getRange(SETTINGS.col.SystemCreated);
-    if (!systemCreated.getValue()) {
+    // Checks function createSystem is run
+    var systemCreated = sheetSettings.getRange(SETTINGS.col.systemCreated);
+    if (!systemCreated.getValue()){
       systemCreated.setValue('True');
     } else {
-      showUiDialog('Warning', 'Solution has already been created!');
+      showUiDialog('Warnning','Solution has already been created!');
       return;
     }
 
-    // Initialise Count cell if empty
-    var count = sheetSettings.getRange(SETTINGS.col.Count);
-    if (!count.getValue()) {
+    // Checks if cell Count exists
+    var count = sheetSettings.getRange(SETTINGS.col.count);
+    if(!count.getValue()){
       count.setValue(0);
     }
 
-    // Create the solution folder structure on the user's Drive
+    // Create the Solution folder on users Drive
     var invoiceFolder = DriveApp.createFolder('Invoice Folder');
     var folder = invoiceFolder.createFolder('Invoices');
 
-    // Surface the folder URL on the Instructions tab
+    // Set URL Invoice Folder in tab Instructions
     ss.getSheetByName('Instructions').getRange('C15').setValue(invoiceFolder.getUrl());
 
-    // Move the active spreadsheet into the new folder
+    // Move the current Dashboard spreadsheet into the Solution folder
     var file = DriveApp.getFileById(SpreadsheetApp.getActive().getId());
     file.setName(SETTINGS.spreadsheetName);
+
+    // Move the sheet for invoice folder
     moveFile(file, invoiceFolder);
 
-    // Copy the template doc into the new folder
+    // Move the current Dashboard template into the Solution folder
     var doc = DriveApp.getFileById(SETTINGS.templateUrl);
     var docCopy = doc.makeCopy(SETTINGS.documentName);
-    sheetSettings.getRange(SETTINGS.col.Original_ID).setValue(docCopy.getId());
+
+    // Set tab settings document ID
+    sheetSettings.getRange(SETTINGS.col.templateId).setValue(docCopy.getId());
+
+    // Move an copy for invoice folder
     moveFile(docCopy, invoiceFolder);
 
-    // Record the invoices folder ID
-    sheetSettings.getRange(SETTINGS.col.Original_Folder_ID).setValue(folder.getId());
+    // Set folder ID
+    sheetSettings.getRange(SETTINGS.col.folderId).setValue(folder.getId());
 
+
+    // End process
     showUiDialog('Success', 'Your solution is ready');
+
     return true;
   } catch (e) {
-    showUiDialog('Something went wrong', e.message);
+
+    // Show the error
+    showUiDialog('Something went wrong', e.message)
+
   }
 }
+
 
 /**
- * Creates the per-year Original / Copy subfolders and writes their IDs back to Settings.
- */
-function init() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const settingsSheet = ss.getSheetByName(SETTINGS.sheetSettings);
-
-  if (!settingsSheet) {
-    throw new Error('Settings sheet not found. Please ensure the sheet is named correctly.');
-  }
-
-  const currentYear = new Date().getFullYear();
-
-  // Locate the parent of the existing original-document folder (two levels up)
-  const settingsSheetValues = settingsSheet.getDataRange().getValues();
-  const existingOriginalDocumentId = settingsSheetValues[2][1];
-
-  const originalDocument = DriveApp.getFileById(existingOriginalDocumentId);
-  const originalDocumentParent = originalDocument.getParents().next();
-  const pdfFolder = originalDocumentParent.getParents().next();
-
-  // Find or create the year folder
-  let newYearFolder;
-  const yearFolders = pdfFolder.getFoldersByName(currentYear.toString());
-  if (yearFolders.hasNext()) {
-    newYearFolder = yearFolders.next();
-  } else {
-    newYearFolder = pdfFolder.createFolder(currentYear.toString());
-  }
-
-  const originalFolderId = newYearFolder.createFolder("Original").getId();
-  const copyFolderId = newYearFolder.createFolder("Copy").getId();
-
-  settingsSheet.getRange(SETTINGS.col.Original_Folder_ID).setValue(originalFolderId);
-  settingsSheet.getRange(SETTINGS.col.Copy_Folder_ID).setValue(copyFolderId);
-
-  SpreadsheetApp.getUi().alert('Folders created and settings updated successfully!');
-}
-
-/* =================================================================================
- *  Main entry: generate invoices for every unprocessed row
- * ================================================================================= */
-
+* Reads the spreadsheet data and creates the PDF invoice
+*/
 function sendInvoice() {
-  Logger.log('Script Started');
+    Logger.log('144: Script Started');
 
+  const EDITOR = "anis@sli-eg.com";
+//var response = SpreadsheetApp.getUi().alert('Do you want to generate document?', SpreadsheetApp.getUi().ButtonSet.YES_NO);    // Opens the spreadsheet and access the tab containing the data
+  //if (response == SpreadsheetApp.getUi().Button.YES) {
   try {
+
+    Logger.log('151: YES to start script');
+
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var dataSheet = ss.getSheetByName(SETTINGS.sheetName);
     var sheetSettings = ss.getSheetByName(SETTINGS.sheetSettings);
 
+   /*
+    // Checks if cell Count exists
+    var count = sheetSettings.getRange(SETTINGS.col.Count).getValue();
+    if(!count){
+      sheetSettings.getRange(SETTINGS.col.Count).setValue(0);
+    }
+    */
+
+
+    // Gets all values from the instanciated tab
     var sheetValues = dataSheet.getDataRange().getValues();
 
-    var pdfIndex      = sheetValues[0].indexOf("Original_Url");
-    var pdf_ID_Index  = sheetValues[0].indexOf("orginal_ID");
-    var copyUrlIdx    = sheetValues[0].indexOf("Copy_Url");
-    var copyIdIdx     = sheetValues[0].indexOf("copy_ID");
-    var serialIndex   = sheetValues[0].indexOf("Serial_Number");
-    var draftIndex    = sheetValues[0].indexOf("draft");
-    var deleteIndex   = sheetValues[0].indexOf("delete");
+    var pdfIndex = sheetValues[0].indexOf("Original_Url");
+    var pdf_ID_Index = sheetValues[0].indexOf("orginal_ID");
+    var copyUrlIdx = sheetValues[0].indexOf("Copy_Url");
+    var copyIdIdx = sheetValues[0].indexOf("copy_ID");
+
+
+    var serialIndex = sheetValues[0].indexOf("Serial_Number");
+    var draftIndex = sheetValues[0].indexOf("draft");
+    var deleteIndex = sheetValues[0].indexOf("delete");
+
+    // Gets the user's name (will be used as the PDF file name)
+    // var clientNameIndex = sheetValues[0].indexOf("client_name");
+
+    var counter, invoiceNumCount;
 
     var settingsSheetValues = sheetSettings.getDataRange().getValues();
 
-    // Has setup been completed?
-    var control = settingsSheetValues[11][1];
-    if (!control) {
-      showUiDialog('Warning', 'Run "Install Solution" in tab Instructions');
+    // Checks function createSystem is run
+    var control = settingsSheetValues[11][1]
+    if (!control){
+      showUiDialog('Warnning','Run "Install Solution" in tab Instructions');
       return;
     }
 
-    var counter           = settingsSheetValues[0][1];
-    var originalsDocument = settingsSheetValues[1][1] + "";
-    var originalsFolder   = settingsSheetValues[2][1] + "";
-    var copyDocument      = settingsSheetValues[5][1] + "";
-    var copyFolder        = settingsSheetValues[6][1] + "";
+    // Duplicate teh template on Google Drive to manipulate the data
+     counter = settingsSheetValues[0][1]
 
-    Logger.log('Loaded all data');
 
-    var invoiceNumCount;
-    var failures = [];
+    //var originalsDocument = sheetSettings.getRange(SETTINGS.col.Original_ID).getValue();
+    var originalsDocument =  settingsSheetValues[1][1]+""
+  //SpreadsheetApp.getUi().alert('indexOf method on a string in google app originalsDocument '+originalsDocument)
+    //var originalsFolder = sheetSettings.getRange(SETTINGS.col.Original_Folder_ID).getValue();
+    var originalsFolder =  settingsSheetValues[2][1]+""
+
+    //var copyDocument = sheetSettings.getRange(SETTINGS.col.Copy_ID).getValue();
+    var copyDocument =  settingsSheetValues[5][1]+""
+
+   // var copyFolder = sheetSettings.getRange(SETTINGS.col.Copy_Folder_ID).getValue();
+    var copyFolder =  settingsSheetValues[6][1]+""
+
+    Logger.log('210: Loaded all data');
 
     for (var i = 1; i < sheetValues.length; i++) {
-      Logger.log('Loop row ' + i + ' of ' + (sheetValues.length - 1));
 
-      // Skip rows that already have a PDF, are flagged as drafts, or are deleted
-      if (sheetValues[i][pdfIndex] || sheetValues[i][draftIndex] || sheetValues[i][deleteIndex]) {
-        if (sheetValues[i][draftIndex]) {
-          Logger.log('Hit draft row ' + i + ', stopping');
-          break;
-        }
-        continue;
-      }
 
-      Logger.log('Creating invoice for row ' + i);
+    Logger.log('215: Loop for sheetValues'+ i +'of '+ sheetValues.length);
 
-      // Increment counter only when there is no existing serial number
-      var existingSerial = (sheetValues[i][serialIndex] != null)
-          ? sheetValues[i][serialIndex].toString().trim()
-          : '';
+      // Creates the Invoice
+      if (!sheetValues[i][pdfIndex] && !sheetValues[i][draftIndex] && !sheetValues[i][deleteIndex]) {
+        Logger.log('220: Creating Invoice'+ i );
 
-      if (existingSerial.length === 0) {
-        invoiceNumCount = counter + 1;
-        sheetSettings.getRange(SETTINGS.col.Count).setValue(invoiceNumCount);
-        counter = invoiceNumCount;
-      } else {
-        invoiceNumCount = sheetValues[i][serialIndex];
-      }
+    //    var response = SpreadsheetApp.getUi().alert('Generate Invoice '+(counter + 1) + ' ?', SpreadsheetApp.getUi().ButtonSet.YES_NO);    // Opens the spreadsheet and access the tab containing the data
+    //     if (response == SpreadsheetApp.getUi().Button.NO) continue;
 
-      try {
-        Logger.log('Create Original for row ' + i);
-        createInvoices(dataSheet, sheetValues, i, originalsDocument,
-                       invoiceNumCount, originalsFolder, "Original",
-                       pdfIndex, pdf_ID_Index);
+       // Get last invoice count from the tab 'Count'
+       // counter = sheetSettings.getRange(SETTINGS.col.Count);
+      // if(!sheetValues[i+1][serialIndex+1])
+       // SpreadsheetApp.getUi().alert(sheetValues[i][serialIndex] +' & '+dataSheet.getRange(i + 1, serialIndex + 1).getValue());
 
-        Logger.log('Create Copy for row ' + i);
-        createInvoices(dataSheet, sheetValues, i, copyDocument,
-                       invoiceNumCount, copyFolder, "Copy",
-                       copyUrlIdx, copyIdIdx);
+      //  SpreadsheetApp.getUi().alert((sheetValues[i+1][serialIndex]?.trim()?.length || 0) === 0);
 
-        Logger.log('Set serial for row ' + i);
+
+       if((sheetValues[i][serialIndex]?.toString().trim()?.length || 0) === 0){ // avoid incremental the counter
+        Logger.log('233: NO Serial'+ i );
+
+            invoiceNumCount = counter + 1;
+            sheetSettings.getRange(SETTINGS.col.Count).setValue(invoiceNumCount);
+            counter = invoiceNumCount
+
+        } else invoiceNumCount = sheetValues[i][serialIndex];
+
+        Logger.log('242: CreateOriginal'+ i );
+        //OriginalInvoice
+        createInvoices(dataSheet,sheetValues,i,originalsDocument,invoiceNumCount,originalsFolder,"Original",pdfIndex,pdf_ID_Index)
+
+        Logger.log('246: CreateCopy'+ i );
+        //CopyInvoice
+        createInvoices(dataSheet,sheetValues,i,copyDocument,invoiceNumCount,copyFolder,"Copy",copyUrlIdx,copyIdIdx)
+
+        Logger.log('250: SetSerial'+ i );
+        //set the serial number in the sheet
         dataSheet.getRange(i + 1, serialIndex + 1).setValue(invoiceNumCount);
         dataSheet.getRange(i + 1, draftIndex + 1).setValue("FALSE");
         dataSheet.getRange(i + 1, deleteIndex + 1).setValue("FALSE");
 
-        Logger.log('Protect row ' + i);
-        protectRow(ss, i);
-      } catch (rowError) {
-        Logger.log('Row ' + i + ' failed: ' + rowError.message);
-        failures.push('Row ' + (i + 1) + ': ' + rowError.message);
-        // Continue with the next row instead of aborting the whole batch
-      }
-    }
 
-    if (failures.length > 0) {
-      showUiDialog('Finished with errors',
-                   'Some rows failed:\n\n' + failures.join('\n'));
-    } else {
-      Logger.log('All rows processed successfully');
+
+
+
+        Logger.log('260: protectRow'+ i );
+        //protect row from futher editing
+        protectRow(ss,i);
+
+
+      }
+      else if(sheetValues[i][draftIndex]){
+        Logger.log('267: Break END'+ i );
+        break;
+      }
     }
   } catch (e) {
-    showUiDialog('Finished Invoice Generation', e.message);
+
+    // Show the error
+    showUiDialog('Finished Invoice Generation', e.message)
+
   }
+
+//}
 }
 
-/* =================================================================================
- *  Per-row invoice creation
- * ================================================================================= */
-
-/**
- * Copies the template, fills it with row data, converts to PDF, then trashes the temp doc.
- */
-function createInvoices(dataSheet, sheetValues, rowIndex, docId, invoiceNumCount,
-                        folderId, linkText, clmnLinkIndex, clmnIdIndex) {
-  var invoiceId = null;
-
-  try {
-    Logger.log('createInvoices [' + linkText + '] - copy template');
-    invoiceId = retryOnDriveError(function () {
-      return DriveApp.getFileById(docId).makeCopy(linkText + "_Template").getId();
-    }, 'makeCopy ' + linkText);
-
-    Logger.log('createInvoices [' + linkText + '] - fill document');
-    var newFileTitle = createDocument(sheetValues, rowIndex, invoiceId,
-                                      invoiceNumCount, linkText);
-
-    Logger.log('createInvoices [' + linkText + '] - read existing PDF id');
-    var existingFileId = dataSheet.getRange(rowIndex + 1, clmnIdIndex + 1).getValue();
-
-    Logger.log('createInvoices [' + linkText + '] - convert to PDF');
-    var pdfInvoice = retryOnDriveError(function () {
-      return convertPDF(invoiceId, folderId, newFileTitle, existingFileId);
-    }, 'convertPDF ' + linkText);
-
-    Logger.log('createInvoices [' + linkText + '] - write back URL & id');
-    dataSheet.getRange(rowIndex + 1, clmnLinkIndex + 1)
-             .setValue(createHyperlinkString(pdfInvoice[0], linkText));
-    dataSheet.getRange(rowIndex + 1, clmnIdIndex + 1).setValue(pdfInvoice[1]);
-
-    Logger.log('createInvoices [' + linkText + '] - trash template copy');
-    safeTrash(invoiceId);
-  } catch (error) {
-    Logger.log('createInvoices [' + linkText + '] error: ' + error.message);
-    // Best-effort cleanup of the temp template copy
-    safeTrash(invoiceId);
-    // Rethrow so sendInvoice can record this row as a failure
-    throw error;
+function createInvoices(dataSheet,sheetValues,rowIndex,docId,invoiceNumCount,folderId,linkText,clmnLinkIndex,clmnIdIndex){
+ try{
+  Logger.log('282: createInvoices - getFile and make copy' );
+  var invoiceId = DriveApp.getFileById(docId).makeCopy(linkText+"_Template").getId();
+  Logger.log('284: createInvoices - create document' );
+  var newFileTitle = createDocument(sheetValues,rowIndex,invoiceId,invoiceNumCount,linkText);
+  Logger.log('286: read existing id' );
+  var existingFileId = dataSheet.getRange(rowIndex + 1, clmnIdIndex + 1).getValue();
+  // Convert the Invoice Document into a PDF file
+  Logger.log('289: createInvoices - convert to pdf' );
+  var pdfInvoice = convertPDF(invoiceId,folderId,newFileTitle,existingFileId);
+   // Set the PDF url into the spreadsheet
+   Logger.log('292: createInvoices - add urls' );
+  dataSheet.getRange(rowIndex + 1, clmnLinkIndex + 1).setValue(createHyperlinkString(pdfInvoice[0],linkText));
+  Logger.log('294: createInvoices - create pdf invoice' );
+  dataSheet.getRange(rowIndex + 1, clmnIdIndex + 1).setValue(pdfInvoice[1]);
+  Logger.log('296: createInvoices - delete templete' );
+    // Delete the original document (will leave only the PDF)
+  Drive.Files.remove(invoiceId);
+ }catch (error) {
+    showUiDialog('Finished Invoice Generation CI',error.message);
+    Drive.Files.remove(invoiceId);
   }
+
 }
 
-/**
- * Trashes a Drive file by ID, swallowing any errors. Safe to call with null/undefined.
- */
-function safeTrash(fileId) {
-  if (!fileId) return;
-  try {
-    DriveApp.getFileById(fileId).setTrashed(true);
-  } catch (cleanupErr) {
-    Logger.log('safeTrash failed for ' + fileId + ': ' + cleanupErr.message);
-  }
+function createDocument(sheetValues,rowIndex,invoiceId,invoiceNumCount,linkText){
+
+        var key, values , invoiceNumber, invoiceDate;
+
+        // Instantiate the document
+        var docBody = DocumentApp.openById(invoiceId).getBody();
+
+        // Iterates over the spreadsheet columns to get the values used to write the document
+        for (var j = 0; j < sheetValues[rowIndex].length; j++) {
+
+          // Key and Values to be replaced
+          key = sheetValues[0][j];
+          values = sheetValues[rowIndex][j];
+
+        if (key === "date") {
+          // Use Utilities.formatDate with the spreadsheet's timezone to avoid date shifting
+          var timezone = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+          invoiceDate = Utilities.formatDate(values, timezone, "d/M/yyyy");
+          replace('%date%', invoiceDate, docBody);
+        }else if (values) {
+
+            // Everything else appart from date values
+             if (key === "mawb_no" ||
+             key === "hawb_no" ||
+             key === "no_pieces" ||
+             key === "discharge_txt" ||
+             key ==="natural"||
+             key ==="decimal"||
+              key ==="cash"||
+              key ==="rout" ||
+              key ==="weight"||
+              key ==="gross_weight"
+             ) {
+                  replace('%' + key + '%', values, docBody)
+            } else {
+              if (!isNaN(parseFloat(values)) && isFinite(values)) {
+                  replace('%' + key + '%',  financial(values), docBody); // Replace values
+              } else{
+              replace('%' + key + '%', values, docBody)
+            }
+            }
+          }
+
+           else {
+            replace('%' + key + '%', '', docBody) // Replace empty string
+          }
+        }
+
+         var newFileTitle;
+        // Format invoice name pdf
+        invoiceNumber = invoiceNumCount.padLeft(7, '0') + "/" + invoiceDate.split("/")[2];
+        replace('%number%', invoiceNumber, docBody);
+        newFileTitle = invoiceNumber+" - "+linkText;
+        // Rename the invoice document
+        DocumentApp.openById(invoiceId).setName(newFileTitle).saveAndClose();
+
+return newFileTitle;
+
 }
 
-/**
- * Replaces template placeholders with row data and saves the document.
- * Returns the title that was set on the document.
- */
-function createDocument(sheetValues, rowIndex, invoiceId, invoiceNumCount, linkText) {
-  var key, values, invoiceNumber, invoiceDate;
+function protectRow(ss,rowIndex){
+       Logger.log('372: protectRow - start' );
+       var rangeString = "Data!"+(rowIndex+1)+":"+(rowIndex+1);
+        // Protect range....
+        var range = ss.getRange(rangeString);
+        var protectionDescription = 'INVOICE CREATED ROW '+(rowIndex+1);
+        Logger.log('377: removeProtection - removeProtections' );
+        removeProtections(ss,protectionDescription);
+        Logger.log('377: protect - range.protect' );
+        var protection = range.protect().setDescription(protectionDescription);
 
-  var doc = DocumentApp.openById(invoiceId);
-  var docBody = doc.getBody();
+        // Ensure the current user is an editor before removing others. Otherwise, if the user's edit
+        // permission comes from a group, the script throws an exception upon removing the group.
+        Logger.log('384: protection - removeEditors' );
+        protection.removeEditors(protection.getEditors());
+        protection.addEditor("anis@sli-eg.com");
+        protection.addEditor("george@sli-eg.com");
+        if (protection.canDomainEdit()) {
+          protection.setDomainEdit(false);
+        }
 
-  // Columns whose values must be inserted as-is (no numeric formatting)
-  var rawKeys = {
-    'mawb_no': 1, 'hawb_no': 1, 'no_pieces': 1, 'discharge_txt': 1,
-    'natural': 1, 'decimal': 1, 'cash': 1, 'rout': 1,
-    'weight': 1, 'gross_weight': 1
-  };
-
-  for (var j = 0; j < sheetValues[rowIndex].length; j++) {
-    key    = sheetValues[0][j];
-    values = sheetValues[rowIndex][j];
-
-    if (key === "date") {
-      var timezone = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
-      invoiceDate = Utilities.formatDate(values, timezone, "d/M/yyyy");
-      replace('%date%', invoiceDate, docBody);
-    } else if (values) {
-      if (rawKeys[key]) {
-        replace('%' + key + '%', values, docBody);
-      } else if (!isNaN(parseFloat(values)) && isFinite(values)) {
-        replace('%' + key + '%', financial(values), docBody);
-      } else {
-        replace('%' + key + '%', values, docBody);
-      }
-    } else {
-      replace('%' + key + '%', '', docBody);
-    }
-  }
-
-  // Format the invoice number and rename the file
-  invoiceNumber = invoiceNumCount.padLeft(7, '0') + "/" + invoiceDate.split("/")[2];
-  replace('%number%', invoiceNumber, docBody);
-
-  var newFileTitle = invoiceNumber + " - " + linkText;
-  doc.setName(newFileTitle).saveAndClose();
-
-  return newFileTitle;
 }
 
-/* =================================================================================
- *  Row protection
- * ================================================================================= */
+function removeProtections(ss,protectionDescription)
+{
+ Logger.log('396: removeProtections - removeProtections get protections' );
 
-function protectRow(ss, rowIndex) {
-  Logger.log('protectRow ' + rowIndex);
-  var rangeString = "Data!" + (rowIndex + 1) + ":" + (rowIndex + 1);
-  var range = ss.getRange(rangeString);
-  var protectionDescription = 'INVOICE CREATED ROW ' + (rowIndex + 1);
-
-  removeProtections(ss, protectionDescription);
-  var protection = range.protect().setDescription(protectionDescription);
-
-  protection.removeEditors(protection.getEditors());
-  for (var k = 0; k < SETTINGS.editors.length; k++) {
-    protection.addEditor(SETTINGS.editors[k]);
-  }
-  if (protection.canDomainEdit()) {
-    protection.setDomainEdit(false);
-  }
-}
-
-function removeProtections(ss, protectionDescription) {
   var protections = ss.getProtections(SpreadsheetApp.ProtectionType.RANGE);
-  for (var i = 0; i < protections.length; i++) {
-    if (protections[i].getDescription() == protectionDescription) {
-      protections[i].remove();
+   Logger.log('399: removeProtections - Loop' );
+
+for (var i = 0; i < protections.length; i++) {
+  if (protections[i].getDescription() == protectionDescription) {
+     protections[i].remove();
     }
   }
 }
-
-function removeSpecificProtections() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheets = ss.getSheets();
-
-  for (var i = 0; i < sheets.length; i++) {
-    var protections = sheets[i].getProtections(SpreadsheetApp.ProtectionType.RANGE);
-    for (var j = 0; j < protections.length; j++) {
-      var description = protections[j].getDescription();
-      if (description && description.match(/^INVOICE CREATED ROW \d+$/)) {
-        protections[j].remove();
-      }
-    }
-  }
-}
-
-/* =================================================================================
- *  Drive helpers
- * ================================================================================= */
-
 /**
- * Move a file from one folder into another.
- */
+* Move a file from one folder into another
+* @param {Object} file A file object in Google Drive
+* @param {Object} dest_folder A folder object in Google Drive
+*/
 function moveFile(file, dest_folder, isFolder) {
+
   if (isFolder === true) {
-    dest_folder.addFolder(file);
+    dest_folder.addFolder(file)
   } else {
     dest_folder.addFile(file);
   }
@@ -496,84 +421,174 @@ function moveFile(file, dest_folder, isFolder) {
     var folder = parents.next();
     if (folder.getId() != dest_folder.getId()) {
       if (isFolder === true) {
-        folder.removeFolder(file);
+        folder.removeFolder(file)
       } else {
-        folder.removeFile(file);
+        folder.removeFile(file)
       }
+
     }
   }
 }
 
 /**
- * Convert a Google Doc into a PDF file. If existingFileID is provided, the
- * existing PDF is replaced (old one trashed, new one created in invFolder);
- * otherwise a new PDF is created in invFolder.
- *
- * @param {string} templateGdocId  ID of the source Google Doc
- * @param {string} invFolder       ID of the destination folder
- * @param {string} fileName        PDF filename
- * @param {string} existingFileID  Optional ID of an existing PDF to replace
- * @returns {[string, string]}     [url, id]
- */
-function convertPDF(templateGdocId, invFolder, fileName, existingFileID) {
+* Convert a Google Docs into a PDF file
+* @param {string} id - File Id
+* @returns {*[]}
+*/
+function convertPDF(templateGdocId,invFolder,fileName,existingFileID) {
   var docBlob = DocumentApp.openById(templateGdocId).getAs('application/pdf');
-  docBlob.setName(fileName);
+  docBlob.setName(fileName); // Add the PDF extension
+ // for(var i = 0; i < file.getEditors().length;i++){
+ //     file.revokePermissions(file.getEditors()[i]);
+ // }
+  //file.addViewer("nevineezzat@sli-eg.com")
 
-  // If an existing PDF is referenced, validate and trash it.
-  // Avoids the deprecated v2 Drive.Files.update signature that triggers
-  // "Empty response" errors on some accounts.
-  if (existingFileID) {
-    try {
-      DriveApp.getFileById(existingFileID).setTrashed(true);
-    } catch (e) {
-      Logger.log('convertPDF: existingFileID ' + existingFileID +
-                 ' could not be trashed (' + e.message + '), continuing.');
-    }
+
+
+ var currentFile, newFile, url,id;
+
+ if(existingFileID){
+  currentFile = DriveApp.getFileById(existingFileID);
+  }
+  if (currentFile) {//If there is a truthy value for the current file
+    newFile = Drive.Files.update({
+      title: fileName, mimeType: currentFile.getMimeType()
+    }, currentFile.getId(), docBlob);
+    url = DriveApp.getFileById(existingFileID).getUrl();
+
+  }else{
+    newFile = DriveApp.getFolderById(invFolder).createFile(docBlob);
+    url = newFile.getUrl();
+
   }
 
-  var newFile = DriveApp.getFolderById(invFolder).createFile(docBlob);
-  return [newFile.getUrl(), newFile.getId()];
+     id = newFile.getId();
+
+  return [url, id];
 }
 
-/* =================================================================================
- *  Misc helpers
- * ================================================================================= */
-
 /**
- * Replace a placeholder in the document body with the supplied text.
- */
+* Replace the document key/value
+* @param {String} key - The document key to be replaced
+* @param {String} text - The document text to be inserted
+* @param {Body} body - the active document's Body.
+* @returns {Element}
+*/
 function replace(key, text, body) {
   return body.editAsText().replaceText(key, text);
 }
 
+
 /**
- * Right-align by left-padding to a fixed length.
- */
+* Returns a new string that right-aligns the characters in this instance by padding them with any string on the left,
+* for a specified total length.
+* @param {Number} n - Number of characters to pad
+* @param {String} str - The string to be padded
+* @returns {string}
+*/
 Number.prototype.padLeft = function (n, str) {
   return Array(n - String(this).length + 1).join(str || '0') + this;
 };
 
+/**
+* Loads the showDialog
+*/
 function showDialog() {
   var html = HtmlService.createHtmlOutputFromFile('iframe.html')
-    .setWidth(200)
-    .setHeight(150);
-  SpreadsheetApp.getUi().showModalDialog(html, 'Creating Solution..');
+  .setWidth(200)
+  .setHeight(150)
+  SpreadsheetApp.getUi().showModalDialog(html, 'Creating Solution..')
 }
 
-function createHyperlinkString(link, text) {
-  return '=HYPERLINK("' + link + '", "' + text + '")';
-}
 
+function createHyperlinkString(link,text){
+  return value = `=HYPERLINK("${link}", "${text}")`;
+}
+/**
+* Show an UI dialog
+* @param {string} title - Dialog title
+* @param {string} message - Dialog message
+*/
 function showUiDialog(title, message) {
   try {
-    var ui = SpreadsheetApp.getUi();
-    ui.alert(title, message, ui.ButtonSet.OK);
+    var ui = SpreadsheetApp.getUi()
+    ui.alert(title, message, ui.ButtonSet.OK)
   } catch (e) {
-    // No UI context available (e.g., triggered run) — log instead.
-    Logger.log('showUiDialog: ' + title + ' - ' + message);
+    // pass
   }
 }
 
 function financial(x) {
   return Number.parseFloat(x).toFixed(2);
+}
+
+function removeSpecificProtections() {
+  // Get the active spreadsheet
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Get all sheets in the spreadsheet
+  var sheets = ss.getSheets();
+
+  // Loop through each sheet
+  for (var i = 0; i < sheets.length; i++) {
+    var sheet = sheets[i];
+
+    // Get all protections on the current sheet
+    var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+
+    // Loop through each protection
+    for (var j = 0; j < protections.length; j++) {
+      var protection = protections[j];
+
+      // Check if the protection's description matches the pattern
+      var description = protection.getDescription();
+      if (description && description.match(/^INVOICE CREATED ROW \d+$/)) {
+        protection.remove();
+      }
+    }
+  }
+}
+function init() {
+  // Get the active spreadsheet and its sheet
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const settingsSheet = ss.getSheetByName(SETTINGS.sheetSettings);
+
+  // Check if the settings sheet exists
+  if (!settingsSheet) {
+    throw new Error('Settings sheet not found. Please ensure the sheet is named correctly.');
+  }
+
+  // Get the current year
+  const currentYear = new Date().getFullYear();
+
+  // Get existing folder IDs from the settings sheet
+  const settingsSheetValues = settingsSheet.getDataRange().getValues();
+  const existingOriginalDocumentId = settingsSheetValues[2][1]; // Assuming Original_ID is in row 2, column 2
+
+  // Get the parent folder of the existing original document
+  const originalDocument = DriveApp.getFileById(existingOriginalDocumentId);
+  const originalDocumentParent = originalDocument.getParents().next(); // Get the immediate parent folder
+
+  // Get the parent folder of the original document's parent (two levels up)
+  const pdfFolder = originalDocumentParent.getParents().next();
+
+  // Check if the folder for the current year exists
+  let newYearFolder;
+  const yearFolders = pdfFolder.getFoldersByName(currentYear.toString());
+  if (yearFolders.hasNext()) {
+    newYearFolder = yearFolders.next();
+  } else {
+    newYearFolder = pdfFolder.createFolder(currentYear.toString());
+  }
+
+  // Create "Original" and "Copy" subfolders within the year folder
+  const originalFolderId = newYearFolder.createFolder("Original").getId();
+  const copyFolderId = newYearFolder.createFolder("Copy").getId();
+
+  // Update the settings sheet with the new folder IDs
+  settingsSheet.getRange(SETTINGS.col.Original_Folder_ID).setValue(originalFolderId);
+  settingsSheet.getRange(SETTINGS.col.Copy_Folder_ID).setValue(copyFolderId);
+
+  // Show a confirmation dialog
+  SpreadsheetApp.getUi().alert('Folders created and settings updated successfully!');
 }
