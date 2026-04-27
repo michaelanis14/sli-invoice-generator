@@ -353,9 +353,15 @@ function createDocument(sheetValues,rowIndex,invoiceId,invoiceNumCount,linkText)
           values = sheetValues[rowIndex][j];
 
         if (key === "date") {
-          // Use Utilities.formatDate with the spreadsheet's timezone to avoid date shifting
-          var timezone = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
-          invoiceDate = Utilities.formatDate(values, timezone, "d/M/yyyy");
+          // Use Utilities.formatDate with the spreadsheet's timezone to avoid date shifting.
+          // Guard against empty cells or string-formatted dates so a single bad row
+          // doesn't abort the whole batch.
+          if (values instanceof Date) {
+            var timezone = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+            invoiceDate = Utilities.formatDate(values, timezone, "d/M/yyyy");
+          } else {
+            invoiceDate = values ? String(values) : '';
+          }
           replace('%date%', invoiceDate, docBody);
         }else if (values) {
 
