@@ -68,7 +68,6 @@ function onOpen() {
   // Adds a custom menu to the spreadsheet.
   SpreadsheetApp.getUi()
   .createMenu('Invoice Generator')
-  .addItem('Generate Drafts', 'createDraft')
   .addItem('Generate Invoices', 'sendInvoice')
   .addToUi();
 }
