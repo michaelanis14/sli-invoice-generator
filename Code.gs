@@ -283,9 +283,10 @@ function sendInvoice() {
 }
 
 function createInvoices(dataSheet,sheetValues,rowIndex,docId,invoiceNumCount,folderId,linkText,clmnLinkIndex,clmnIdIndex){
+ var invoiceId;
  try{
   Logger.log('282: createInvoices - getFile and make copy' );
-  var invoiceId = DriveApp.getFileById(docId).makeCopy(linkText+"_Template").getId();
+  invoiceId = DriveApp.getFileById(docId).makeCopy(linkText+"_Template").getId();
   Logger.log('284: createInvoices - create document' );
   var newFileTitle = createDocument(sheetValues,rowIndex,invoiceId,invoiceNumCount,linkText);
   Logger.log('286: read existing id' );
@@ -300,12 +301,42 @@ function createInvoices(dataSheet,sheetValues,rowIndex,docId,invoiceNumCount,fol
   dataSheet.getRange(rowIndex + 1, clmnIdIndex + 1).setValue(pdfInvoice[1]);
   Logger.log('296: createInvoices - delete templete' );
     // Delete the original document (will leave only the PDF)
-  Drive.Files.remove(invoiceId);
+  safeDeleteFile(invoiceId);
+  invoiceId = null;
  }catch (error) {
     showUiDialog('Finished Invoice Generation CI',error.message);
-    Drive.Files.remove(invoiceId);
+    if (invoiceId) {
+      safeDeleteFile(invoiceId);
+    }
   }
 
+}
+
+/**
+* Safely trash a Drive file. Avoids the "Empty response" error from
+* Drive.Files.remove() by using DriveApp + setTrashed, with retry on
+* transient failures. Failure here is non-fatal — the template copy
+* will end up in Trash even if the call partially fails.
+* @param {string} fileId
+*/
+function safeDeleteFile(fileId) {
+  if (!fileId) return;
+  var maxAttempts = 3;
+  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      var file = DriveApp.getFileById(fileId);
+      if (file.isTrashed()) return;
+      file.setTrashed(true);
+      return;
+    } catch (e) {
+      Logger.log('safeDeleteFile attempt ' + attempt + ' failed for ' + fileId + ': ' + e.message);
+      if (attempt === maxAttempts) {
+        Logger.log('safeDeleteFile giving up on ' + fileId);
+        return;
+      }
+      Utilities.sleep(500 * attempt);
+    }
+  }
 }
 
 function createDocument(sheetValues,rowIndex,invoiceId,invoiceNumCount,linkText){
