@@ -280,7 +280,9 @@ function createInvoices(dataSheet,sheetValues,rowIndex,docId,invoiceNumCount,fol
  var invoiceId;
  try{
   Logger.log('createInvoices - getFile and make copy');
-  invoiceId = DriveApp.getFileById(docId).makeCopy(linkText+"_Template").getId();
+  invoiceId = withDriveRetry(function() {
+    return DriveApp.getFileById(docId).makeCopy(linkText+"_Template").getId();
+  }, 'makeCopy');
   Logger.log('createInvoices - create document');
   var newFileTitle = createDocument(sheetValues,rowIndex,invoiceId,invoiceNumCount,linkText);
   Logger.log('createInvoices - read existing id');
@@ -304,6 +306,31 @@ function createInvoices(dataSheet,sheetValues,rowIndex,docId,invoiceNumCount,fol
     }
   }
 
+}
+
+/**
+* Run a Drive operation with retry-and-backoff for transient failures
+* like "Service error: Drive" and "Empty response". Re-throws after
+* the final attempt so callers still see the error.
+* @param {function():*} fn  The Drive call to invoke.
+* @param {string} label     Short name for log lines.
+* @returns {*} Whatever fn returns.
+*/
+function withDriveRetry(fn, label) {
+  var maxAttempts = 4;
+  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return fn();
+    } catch (e) {
+      var msg = (e && e.message) || String(e);
+      var transient = /Service error|Empty response|Internal error|rate limit|backendError|timed? ?out/i.test(msg);
+      Logger.log('withDriveRetry[' + label + '] attempt ' + attempt + ' failed: ' + msg);
+      if (attempt === maxAttempts || !transient) {
+        throw e;
+      }
+      Utilities.sleep(1000 * Math.pow(2, attempt - 1)); // 1s, 2s, 4s
+    }
+  }
 }
 
 /**
@@ -482,15 +509,19 @@ function convertPDF(templateGdocId,invFolder,fileName,existingFileID) {
   currentFile = DriveApp.getFileById(existingFileID);
   }
   if (currentFile) {//If there is a truthy value for the current file
-    Drive.Files.update({
-      title: fileName, mimeType: currentFile.getMimeType()
-    }, currentFile.getId(), docBlob);
+    withDriveRetry(function() {
+      return Drive.Files.update({
+        title: fileName, mimeType: currentFile.getMimeType()
+      }, currentFile.getId(), docBlob);
+    }, 'Drive.Files.update');
     // Drive.Files.update() returns a Drive API resource (field .id, no .getId() method),
     // so we read id/url from currentFile to stay consistent with the create branch.
     id = currentFile.getId();
     url = currentFile.getUrl();
   }else{
-    newFile = DriveApp.getFolderById(invFolder).createFile(docBlob);
+    newFile = withDriveRetry(function() {
+      return DriveApp.getFolderById(invFolder).createFile(docBlob);
+    }, 'createFile');
     id = newFile.getId();
     url = newFile.getUrl();
   }
