@@ -50,8 +50,8 @@ const SETTINGS = {
     Copy_Folder_ID:"B7",
     Deleted_ID:"B8",
     Deleted_Folder_ID:"B9",
-    Puplic_ID:"B10",
-    Puplic_Folder_ID:"B11",
+    Public_ID:"B10",
+    Public_Folder_ID:"B11",
     SystemCreated: "B12"
   }
 };
