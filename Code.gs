@@ -131,7 +131,7 @@ function createSystem() {
   } catch (e) {
 
     // Show the error
-    showUiDialog('Something went wrong', e.message)
+    showUiDialog('Something went wrong', e.message);
 
   }
 }
@@ -184,27 +184,27 @@ function sendInvoice() {
     var settingsSheetValues = sheetSettings.getDataRange().getValues();
 
     // Checks function createSystem is run
-    var control = settingsSheetValues[11][1]
+    var control = settingsSheetValues[11][1];
     if (!control){
       showUiDialog('Warnning','Run "Install Solution" in tab Instructions');
       return;
     }
 
     // Duplicate teh template on Google Drive to manipulate the data
-     counter = settingsSheetValues[0][1]
+     counter = settingsSheetValues[0][1];
 
 
     //var originalsDocument = sheetSettings.getRange(SETTINGS.col.Original_ID).getValue();
-    var originalsDocument =  settingsSheetValues[1][1]+""
+    var originalsDocument =  settingsSheetValues[1][1]+"";
   //SpreadsheetApp.getUi().alert('indexOf method on a string in google app originalsDocument '+originalsDocument)
     //var originalsFolder = sheetSettings.getRange(SETTINGS.col.Original_Folder_ID).getValue();
-    var originalsFolder =  settingsSheetValues[2][1]+""
+    var originalsFolder =  settingsSheetValues[2][1]+"";
 
     //var copyDocument = sheetSettings.getRange(SETTINGS.col.Copy_ID).getValue();
-    var copyDocument =  settingsSheetValues[5][1]+""
+    var copyDocument =  settingsSheetValues[5][1]+"";
 
    // var copyFolder = sheetSettings.getRange(SETTINGS.col.Copy_Folder_ID).getValue();
-    var copyFolder =  settingsSheetValues[6][1]+""
+    var copyFolder =  settingsSheetValues[6][1]+"";
 
     Logger.log('Loaded all data');
 
@@ -233,17 +233,17 @@ function sendInvoice() {
 
             invoiceNumCount = counter + 1;
             sheetSettings.getRange(SETTINGS.col.Count).setValue(invoiceNumCount);
-            counter = invoiceNumCount
+            counter = invoiceNumCount;
 
         } else invoiceNumCount = sheetValues[i][serialIndex];
 
         Logger.log('CreateOriginal '+ i );
         //OriginalInvoice
-        createInvoices(dataSheet,sheetValues,i,originalsDocument,invoiceNumCount,originalsFolder,"Original",pdfIndex,pdf_ID_Index)
+        createInvoices(dataSheet,sheetValues,i,originalsDocument,invoiceNumCount,originalsFolder,"Original",pdfIndex,pdf_ID_Index);
 
         Logger.log('CreateCopy '+ i );
         //CopyInvoice
-        createInvoices(dataSheet,sheetValues,i,copyDocument,invoiceNumCount,copyFolder,"Copy",copyUrlIdx,copyIdIdx)
+        createInvoices(dataSheet,sheetValues,i,copyDocument,invoiceNumCount,copyFolder,"Copy",copyUrlIdx,copyIdIdx);
 
         Logger.log('SetSerial '+ i );
         //set the serial number in the sheet
@@ -269,7 +269,7 @@ function sendInvoice() {
   } catch (e) {
 
     // Show the error
-    showUiDialog('Finished Invoice Generation', e.message)
+    showUiDialog('Finished Invoice Generation', e.message);
 
   }
 
@@ -372,18 +372,18 @@ function createDocument(sheetValues,rowIndex,invoiceId,invoiceNumCount,linkText)
               key ==="weight"||
               key ==="gross_weight"
              ) {
-                  replace('%' + key + '%', values, docBody)
+                  replace('%' + key + '%', values, docBody);
             } else {
               if (!isNaN(parseFloat(values)) && isFinite(values)) {
                   replace('%' + key + '%',  financial(values), docBody); // Replace values
               } else{
-              replace('%' + key + '%', values, docBody)
+              replace('%' + key + '%', values, docBody);
             }
             }
           }
 
            else {
-            replace('%' + key + '%', '', docBody) // Replace empty string
+            replace('%' + key + '%', '', docBody); // Replace empty string
           }
         }
 
@@ -443,7 +443,7 @@ for (var i = 0; i < protections.length; i++) {
 function moveFile(file, dest_folder, isFolder) {
 
   if (isFolder === true) {
-    dest_folder.addFolder(file)
+    dest_folder.addFolder(file);
   } else {
     dest_folder.addFile(file);
   }
@@ -452,9 +452,9 @@ function moveFile(file, dest_folder, isFolder) {
     var folder = parents.next();
     if (folder.getId() != dest_folder.getId()) {
       if (isFolder === true) {
-        folder.removeFolder(file)
+        folder.removeFolder(file);
       } else {
-        folder.removeFile(file)
+        folder.removeFile(file);
       }
 
     }
@@ -516,8 +516,8 @@ function replace(key, text, body) {
 function showDialog() {
   var html = HtmlService.createHtmlOutputFromFile('iframe.html')
   .setWidth(200)
-  .setHeight(150)
-  SpreadsheetApp.getUi().showModalDialog(html, 'Creating Solution..')
+  .setHeight(150);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Creating Solution..');
 }
 
 
@@ -531,8 +531,8 @@ function createHyperlinkString(link,text){
 */
 function showUiDialog(title, message) {
   try {
-    var ui = SpreadsheetApp.getUi()
-    ui.alert(title, message, ui.ButtonSet.OK)
+    var ui = SpreadsheetApp.getUi();
+    ui.alert(title, message, ui.ButtonSet.OK);
   } catch (e) {
     // pass
   }
