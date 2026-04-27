@@ -141,13 +141,13 @@ function createSystem() {
 * Reads the spreadsheet data and creates the PDF invoice
 */
 function sendInvoice() {
-    Logger.log('144: Script Started');
+    Logger.log('Script Started');
 
 //var response = SpreadsheetApp.getUi().alert('Do you want to generate document?', SpreadsheetApp.getUi().ButtonSet.YES_NO);    // Opens the spreadsheet and access the tab containing the data
   //if (response == SpreadsheetApp.getUi().Button.YES) {
   try {
 
-    Logger.log('151: YES to start script');
+    Logger.log('YES to start script');
 
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -206,16 +206,16 @@ function sendInvoice() {
    // var copyFolder = sheetSettings.getRange(SETTINGS.col.Copy_Folder_ID).getValue();
     var copyFolder =  settingsSheetValues[6][1]+""
 
-    Logger.log('210: Loaded all data');
+    Logger.log('Loaded all data');
 
     for (var i = 1; i < sheetValues.length; i++) {
 
 
-    Logger.log('215: Loop for sheetValues'+ i +'of '+ sheetValues.length);
+    Logger.log('Loop for sheetValues '+ i +' of '+ sheetValues.length);
 
       // Creates the Invoice
       if (!sheetValues[i][pdfIndex] && !sheetValues[i][draftIndex] && !sheetValues[i][deleteIndex]) {
-        Logger.log('220: Creating Invoice'+ i );
+        Logger.log('Creating Invoice '+ i );
 
     //    var response = SpreadsheetApp.getUi().alert('Generate Invoice '+(counter + 1) + ' ?', SpreadsheetApp.getUi().ButtonSet.YES_NO);    // Opens the spreadsheet and access the tab containing the data
     //     if (response == SpreadsheetApp.getUi().Button.NO) continue;
@@ -229,7 +229,7 @@ function sendInvoice() {
 
 
        if((sheetValues[i][serialIndex]?.toString().trim()?.length || 0) === 0){ // avoid incremental the counter
-        Logger.log('233: NO Serial'+ i );
+        Logger.log('NO Serial '+ i );
 
             invoiceNumCount = counter + 1;
             sheetSettings.getRange(SETTINGS.col.Count).setValue(invoiceNumCount);
@@ -237,15 +237,15 @@ function sendInvoice() {
 
         } else invoiceNumCount = sheetValues[i][serialIndex];
 
-        Logger.log('242: CreateOriginal'+ i );
+        Logger.log('CreateOriginal '+ i );
         //OriginalInvoice
         createInvoices(dataSheet,sheetValues,i,originalsDocument,invoiceNumCount,originalsFolder,"Original",pdfIndex,pdf_ID_Index)
 
-        Logger.log('246: CreateCopy'+ i );
+        Logger.log('CreateCopy '+ i );
         //CopyInvoice
         createInvoices(dataSheet,sheetValues,i,copyDocument,invoiceNumCount,copyFolder,"Copy",copyUrlIdx,copyIdIdx)
 
-        Logger.log('250: SetSerial'+ i );
+        Logger.log('SetSerial '+ i );
         //set the serial number in the sheet
         dataSheet.getRange(i + 1, serialIndex + 1).setValue(invoiceNumCount);
         dataSheet.getRange(i + 1, draftIndex + 1).setValue("FALSE");
@@ -255,14 +255,14 @@ function sendInvoice() {
 
 
 
-        Logger.log('260: protectRow'+ i );
+        Logger.log('protectRow '+ i );
         //protect row from futher editing
         protectRow(ss,i);
 
 
       }
       else if(sheetValues[i][draftIndex]){
-        Logger.log('267: Break END'+ i );
+        Logger.log('Break END '+ i );
         break;
       }
     }
@@ -279,21 +279,21 @@ function sendInvoice() {
 function createInvoices(dataSheet,sheetValues,rowIndex,docId,invoiceNumCount,folderId,linkText,clmnLinkIndex,clmnIdIndex){
  var invoiceId;
  try{
-  Logger.log('282: createInvoices - getFile and make copy' );
+  Logger.log('createInvoices - getFile and make copy');
   invoiceId = DriveApp.getFileById(docId).makeCopy(linkText+"_Template").getId();
-  Logger.log('284: createInvoices - create document' );
+  Logger.log('createInvoices - create document');
   var newFileTitle = createDocument(sheetValues,rowIndex,invoiceId,invoiceNumCount,linkText);
-  Logger.log('286: read existing id' );
+  Logger.log('createInvoices - read existing id');
   var existingFileId = dataSheet.getRange(rowIndex + 1, clmnIdIndex + 1).getValue();
   // Convert the Invoice Document into a PDF file
-  Logger.log('289: createInvoices - convert to pdf' );
+  Logger.log('createInvoices - convert to pdf');
   var pdfInvoice = convertPDF(invoiceId,folderId,newFileTitle,existingFileId);
    // Set the PDF url into the spreadsheet
-   Logger.log('292: createInvoices - add urls' );
+  Logger.log('createInvoices - add urls');
   dataSheet.getRange(rowIndex + 1, clmnLinkIndex + 1).setValue(createHyperlinkString(pdfInvoice[0],linkText));
-  Logger.log('294: createInvoices - create pdf invoice' );
+  Logger.log('createInvoices - create pdf invoice');
   dataSheet.getRange(rowIndex + 1, clmnIdIndex + 1).setValue(pdfInvoice[1]);
-  Logger.log('296: createInvoices - delete templete' );
+  Logger.log('createInvoices - delete template');
     // Delete the original document (will leave only the PDF)
   safeDeleteFile(invoiceId);
   invoiceId = null;
@@ -400,19 +400,19 @@ return newFileTitle;
 }
 
 function protectRow(ss,rowIndex){
-       Logger.log('372: protectRow - start' );
+       Logger.log('protectRow - start');
        var rangeString = "Data!"+(rowIndex+1)+":"+(rowIndex+1);
         // Protect range....
         var range = ss.getRange(rangeString);
         var protectionDescription = 'INVOICE CREATED ROW '+(rowIndex+1);
-        Logger.log('377: removeProtection - removeProtections' );
+        Logger.log('protectRow - removeProtections');
         removeProtections(ss,protectionDescription);
-        Logger.log('377: protect - range.protect' );
+        Logger.log('protectRow - range.protect');
         var protection = range.protect().setDescription(protectionDescription);
 
         // Ensure the current user is an editor before removing others. Otherwise, if the user's edit
         // permission comes from a group, the script throws an exception upon removing the group.
-        Logger.log('384: protection - removeEditors' );
+        Logger.log('protectRow - removeEditors');
         protection.removeEditors(protection.getEditors());
         protection.addEditor("anis@sli-eg.com");
         protection.addEditor("george@sli-eg.com");
@@ -424,10 +424,10 @@ function protectRow(ss,rowIndex){
 
 function removeProtections(ss,protectionDescription)
 {
- Logger.log('396: removeProtections - removeProtections get protections' );
+ Logger.log('removeProtections - get protections');
 
   var protections = ss.getProtections(SpreadsheetApp.ProtectionType.RANGE);
-   Logger.log('399: removeProtections - Loop' );
+   Logger.log('removeProtections - Loop');
 
 for (var i = 0; i < protections.length; i++) {
   if (protections[i].getDescription() == protectionDescription) {
