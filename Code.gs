@@ -147,7 +147,6 @@ function createSystem() {
 function sendInvoice() {
     Logger.log('144: Script Started');
 
-  const EDITOR = "anis@sli-eg.com";
 //var response = SpreadsheetApp.getUi().alert('Do you want to generate document?', SpreadsheetApp.getUi().ButtonSet.YES_NO);    // Opens the spreadsheet and access the tab containing the data
   //if (response == SpreadsheetApp.getUi().Button.YES) {
   try {
