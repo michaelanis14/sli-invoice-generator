@@ -18,10 +18,6 @@ Changelog:
 * Project Settings
 * @type {JSON}
 */
-function testUI() {
-  SpreadsheetApp.getUi().alert("Hello! The UI is connected.");
-}
-
 const SETTINGS = {
 
   // Spreadsheet name
