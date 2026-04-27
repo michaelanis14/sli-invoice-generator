@@ -538,7 +538,7 @@ function showDialog() {
 
 
 function createHyperlinkString(link,text){
-  return value = `=HYPERLINK("${link}", "${text}")`;
+  return `=HYPERLINK("${link}", "${text}")`;
 }
 /**
 * Show an UI dialog
