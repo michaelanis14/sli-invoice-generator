@@ -389,7 +389,7 @@ function createDocument(sheetValues,rowIndex,invoiceId,invoiceNumCount,linkText)
 
          var newFileTitle;
         // Format invoice name pdf
-        invoiceNumber = invoiceNumCount.padLeft(7, '0') + "/" + invoiceDate.split("/")[2];
+        invoiceNumber = String(invoiceNumCount).padStart(7, '0') + "/" + invoiceDate.split("/")[2];
         replace('%number%', invoiceNumber, docBody);
         newFileTitle = invoiceNumber+" - "+linkText;
         // Rename the invoice document
@@ -509,17 +509,6 @@ function replace(key, text, body) {
   return body.editAsText().replaceText(key, text);
 }
 
-
-/**
-* Returns a new string that right-aligns the characters in this instance by padding them with any string on the left,
-* for a specified total length.
-* @param {Number} n - Number of characters to pad
-* @param {String} str - The string to be padded
-* @returns {string}
-*/
-Number.prototype.padLeft = function (n, str) {
-  return Array(n - String(this).length + 1).join(str || '0') + this;
-};
 
 /**
 * Loads the showDialog
