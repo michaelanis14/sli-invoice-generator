@@ -86,7 +86,7 @@ function createSystem() {
     var sheetSettings = ss.getSheetByName(SETTINGS.sheetSettings);
 
     // Checks function createSystem is run
-    var systemCreated = sheetSettings.getRange(SETTINGS.col.systemCreated);
+    var systemCreated = sheetSettings.getRange(SETTINGS.col.SystemCreated);
     if (!systemCreated.getValue()){
       systemCreated.setValue('True');
     } else {
@@ -95,7 +95,7 @@ function createSystem() {
     }
 
     // Checks if cell Count exists
-    var count = sheetSettings.getRange(SETTINGS.col.count);
+    var count = sheetSettings.getRange(SETTINGS.col.Count);
     if(!count.getValue()){
       count.setValue(0);
     }
@@ -118,14 +118,14 @@ function createSystem() {
     var doc = DriveApp.getFileById(SETTINGS.templateUrl);
     var docCopy = doc.makeCopy(SETTINGS.documentName);
 
-    // Set tab settings document ID
-    sheetSettings.getRange(SETTINGS.col.templateId).setValue(docCopy.getId());
+    // Set tab settings document ID (Original template — Copy template is set up separately via init())
+    sheetSettings.getRange(SETTINGS.col.Original_ID).setValue(docCopy.getId());
 
     // Move an copy for invoice folder
     moveFile(docCopy, invoiceFolder);
 
     // Set folder ID
-    sheetSettings.getRange(SETTINGS.col.folderId).setValue(folder.getId());
+    sheetSettings.getRange(SETTINGS.col.Original_Folder_ID).setValue(folder.getId());
 
 
     // End process
