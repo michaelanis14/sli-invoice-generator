@@ -481,18 +481,18 @@ function convertPDF(templateGdocId,invFolder,fileName,existingFileID) {
   currentFile = DriveApp.getFileById(existingFileID);
   }
   if (currentFile) {//If there is a truthy value for the current file
-    newFile = Drive.Files.update({
+    Drive.Files.update({
       title: fileName, mimeType: currentFile.getMimeType()
     }, currentFile.getId(), docBlob);
-    url = DriveApp.getFileById(existingFileID).getUrl();
-
+    // Drive.Files.update() returns a Drive API resource (field .id, no .getId() method),
+    // so we read id/url from currentFile to stay consistent with the create branch.
+    id = currentFile.getId();
+    url = currentFile.getUrl();
   }else{
     newFile = DriveApp.getFolderById(invFolder).createFile(docBlob);
+    id = newFile.getId();
     url = newFile.getUrl();
-
   }
-
-     id = newFile.getId();
 
   return [url, id];
 }
