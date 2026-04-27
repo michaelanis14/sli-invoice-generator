@@ -239,20 +239,25 @@ function sendInvoice() {
 
         Logger.log('CreateOriginal '+ i );
         //OriginalInvoice
-        createInvoices(dataSheet,sheetValues,i,originalsDocument,invoiceNumCount,originalsFolder,"Original",pdfIndex,pdf_ID_Index);
+        var originalOk = createInvoices(dataSheet,sheetValues,i,originalsDocument,invoiceNumCount,originalsFolder,"Original",pdfIndex,pdf_ID_Index);
+        if (!originalOk) {
+          Logger.log('Original failed for row '+i+'; skipping Copy and row completion');
+          continue;
+        }
 
         Logger.log('CreateCopy '+ i );
         //CopyInvoice
-        createInvoices(dataSheet,sheetValues,i,copyDocument,invoiceNumCount,copyFolder,"Copy",copyUrlIdx,copyIdIdx);
+        var copyOk = createInvoices(dataSheet,sheetValues,i,copyDocument,invoiceNumCount,copyFolder,"Copy",copyUrlIdx,copyIdIdx);
+        if (!copyOk) {
+          Logger.log('Copy failed for row '+i+'; row left unprotected so it can be retried after clearing the Original_Url cell');
+          continue;
+        }
 
         Logger.log('SetSerial '+ i );
         //set the serial number in the sheet
         dataSheet.getRange(i + 1, serialIndex + 1).setValue(invoiceNumCount);
         dataSheet.getRange(i + 1, draftIndex + 1).setValue("FALSE");
         dataSheet.getRange(i + 1, deleteIndex + 1).setValue("FALSE");
-
-
-
 
 
         Logger.log('protectRow '+ i );
@@ -299,11 +304,14 @@ function createInvoices(dataSheet,sheetValues,rowIndex,docId,invoiceNumCount,fol
     // Delete the original document (will leave only the PDF)
   safeDeleteFile(invoiceId);
   invoiceId = null;
+  return true;
  }catch (error) {
-    showUiDialog('Finished Invoice Generation CI',error.message);
+    Logger.log('createInvoices ['+linkText+'] failed at row '+(rowIndex+1)+': '+error.message);
+    showUiDialog('Invoice Generation Error: '+linkText, error.message);
     if (invoiceId) {
       safeDeleteFile(invoiceId);
     }
+    return false;
   }
 
 }
