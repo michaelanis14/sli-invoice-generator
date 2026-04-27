@@ -593,7 +593,8 @@ function init() {
 
   // Get existing folder IDs from the settings sheet
   const settingsSheetValues = settingsSheet.getDataRange().getValues();
-  const existingOriginalDocumentId = settingsSheetValues[2][1]; // Assuming Original_ID is in row 2, column 2
+  // SETTINGS.col.Original_ID is B2 → 0-indexed [1][1]
+  const existingOriginalDocumentId = settingsSheetValues[1][1];
 
   // Get the parent folder of the existing original document
   const originalDocument = DriveApp.getFileById(existingOriginalDocumentId);
