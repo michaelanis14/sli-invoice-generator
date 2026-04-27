@@ -22,7 +22,7 @@ function testUI() {
   SpreadsheetApp.getUi().alert("Hello! The UI is connected.");
 }
 
-SETTINGS = {
+const SETTINGS = {
 
   // Spreadsheet name
   sheetName: "Data",
