@@ -1,23 +1,4 @@
-/*================================================================================================================*
-Invoice Generator
-================================================================================================================
-Version:      1.0.0
-Project Page: https://github.com/Sheetgo/invoice-generator
-Copyright:    (c) 2018 by Sheetgo
 
-License:      GNU General Public License, version 3 (GPL-3.0)
-http://www.opensource.org/licenses/gpl-3.0.html
-----------------------------------------------------------------------------------------------------------------
-Changelog:
-
-1.0.0  Initial release
-1.1.0  Auto configuration
-*================================================================================================================*/
-
-/**
-* Project Settings
-* @type {JSON}
-*/
 const SETTINGS = {
 
   // Spreadsheet name
